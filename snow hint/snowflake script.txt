@@ -1,0 +1,71 @@
+-- DROP & CREATE DATABASE AND SCHEMA
+DROP DATABASE IF EXISTS redfin_database_1;
+CREATE DATABASE redfin_database_1;
+USE DATABASE redfin_database_1;
+
+CREATE OR REPLACE SCHEMA redfin_schema;
+
+-- DROP EXISTING TABLE IF NEEDED (TRUNCATE won't work if table doesn't exist)
+DROP TABLE IF EXISTS redfin_schema.redfin_table;
+
+-- CREATE TABLE WITH ONLY SELECTED COLUMNS
+CREATE OR REPLACE TABLE redfin_schema.redfin_table (
+    period_end DATE,
+    period_duration INT,
+    city STRING,
+    state STRING,
+    property_type STRING,
+    median_sale_price FLOAT,
+    median_ppsf FLOAT,
+    homes_sold FLOAT,
+    inventory FLOAT,
+    months_of_supply FLOAT,
+    median_dom FLOAT,
+    sold_above_list FLOAT,
+    last_updated TIMESTAMP
+);
+
+-- OPTIONAL: Check contents and count
+SELECT * FROM redfin_schema.redfin_table LIMIT 10;
+SELECT COUNT(*) FROM redfin_schema.redfin_table;
+
+--------------------------------------------------------
+
+-- CREATE FILE FORMAT SCHEMA & FORMAT
+CREATE OR REPLACE SCHEMA file_format_schema;
+
+CREATE OR REPLACE FILE FORMAT file_format_schema.format_csv
+    TYPE = 'CSV'
+    FIELD_DELIMITER = ','
+    RECORD_DELIMITER = '\n'
+    SKIP_HEADER = 1;
+
+--------------------------------------------------------
+
+-- CREATE EXTERNAL STAGE SCHEMA & STAGE OBJECT
+CREATE OR REPLACE SCHEMA external_stage_schema;
+
+CREATE OR REPLACE STAGE external_stage_schema.redfin_ext_stage_yml 
+    URL = 's3://redfin-transform-zone-yml/'
+    CREDENTIALS = (
+        AWS_KEY_ID = 'xxxx',
+        AWS_SECRET_KEY = 'xxxx'
+    )
+    FILE_FORMAT = file_format_schema.format_csv;
+
+-- LIST FILES TO CONFIRM ACCESS
+LIST @external_stage_schema.redfin_ext_stage_yml;
+
+--------------------------------------------------------
+
+-- CREATE SNOWPIPE SCHEMA AND PIPE
+CREATE OR REPLACE SCHEMA snowpipe_schema;
+
+CREATE OR REPLACE PIPE snowpipe_schema.redfin_snowpipe
+AUTO_INGEST = TRUE
+AS 
+COPY INTO redfin_schema.redfin_table
+FROM @external_stage_schema.redfin_ext_stage_yml;
+
+-- DESC TO CHECK PIPE STATUS
+DESC PIPE snowpipe_schema.redfin_snowpipe;
