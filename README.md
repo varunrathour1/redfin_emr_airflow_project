@@ -47,7 +47,7 @@ This project demonstrates an end-to-end data engineering pipeline using Redfin r
 
 ## 4️⃣ Analytics Layer (Power BI)
 
-> Power BI dashboard was created but not included in this repo due to file size limitations.
+
 
 Key visuals included:
 - Region-wise price analysis  
