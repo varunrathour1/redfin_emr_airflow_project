@@ -22,6 +22,10 @@ This project demonstrates an end-to-end data engineering pipeline using Redfin r
 
 ---
 
+## 📊 Project Video
+![Project Video](redfin data analysis.MP4)
+---
+
 ## 1️⃣ Data Ingestion
 
 - `ingest.sh` – Shell script to fetch and stage data.
