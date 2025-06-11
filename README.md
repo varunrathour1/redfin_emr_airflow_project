@@ -44,8 +44,8 @@ This project demonstrates an end-to-end data engineering pipeline using Redfin r
 
 ## 3️⃣ Data Storage - Snowflake
 
-- `snowflake script.txt` – Contains SQL scripts to create Snowflake DB, schemas, and tables.
-- Follows **SCD Type 2** practices for handling slowly changing dimensions.
+- `snowflake script.txt` – Contains SQL scripts to create Snowflake DB, schemas, and tables , Pipe
+- 
 
 ---
 
