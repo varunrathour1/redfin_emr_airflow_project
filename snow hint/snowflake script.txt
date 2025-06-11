@@ -1,3 +1,16 @@
+CREATE OR REPLACE STORAGE INTEGRATION s3_int
+  TYPE = EXTERNAL_STAGE
+  STORAGE_PROVIDER = S3
+  ENABLED = TRUE
+  STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::022499005779:role/snowflake_role'
+  STORAGE_ALLOWED_LOCATIONS = ('s3://redfin-data-project-yml-1/', 's3://redfin-data-project-yml-1/redfin-transform-zone-yml/redfin_data.csv/');
+  
+DESC INTEGRATION s3_int;
+
+
+
+
+
 -- DROP & CREATE DATABASE AND SCHEMA
 DROP DATABASE IF EXISTS redfin_database_1;
 CREATE DATABASE redfin_database_1;
@@ -5,67 +18,120 @@ USE DATABASE redfin_database_1;
 
 CREATE OR REPLACE SCHEMA redfin_schema;
 
--- DROP EXISTING TABLE IF NEEDED (TRUNCATE won't work if table doesn't exist)
-DROP TABLE IF EXISTS redfin_schema.redfin_table;
 
--- CREATE TABLE WITH ONLY SELECTED COLUMNS
-CREATE OR REPLACE TABLE redfin_schema.redfin_table (
-    period_end DATE,
-    period_duration INT,
-    city STRING,
-    state STRING,
-    property_type STRING,
-    median_sale_price FLOAT,
-    median_ppsf FLOAT,
-    homes_sold FLOAT,
-    inventory FLOAT,
-    months_of_supply FLOAT,
-    median_dom FLOAT,
-    sold_above_list FLOAT,
-    last_updated TIMESTAMP
-);
-
--- OPTIONAL: Check contents and count
-SELECT * FROM redfin_schema.redfin_table LIMIT 10;
-SELECT COUNT(*) FROM redfin_schema.redfin_table;
-
---------------------------------------------------------
 
 -- CREATE FILE FORMAT SCHEMA & FORMAT
+
+DROP FILE FORMAT IF EXISTS file_format_schema.format_csv;
+
+
 CREATE OR REPLACE SCHEMA file_format_schema;
 
 CREATE OR REPLACE FILE FORMAT file_format_schema.format_csv
     TYPE = 'CSV'
     FIELD_DELIMITER = ','
     RECORD_DELIMITER = '\n'
-    SKIP_HEADER = 1;
+    SKIP_HEADER = 1
+    NULL_IF = ('', 'NA', 'N/A', 'NULL')    --SAAF SAFAI COMPLETE HUI  POWER BI MAI AB DIRECT KAAM KRENGE
+    -- YAHAN SAHI CHANGE KIYA HAI:
+    FIELD_OPTIONALLY_ENCLOSED_BY = '"' -- Ab yeh sahi parameter hai
+;
 
---------------------------------------------------------
+
 
 -- CREATE EXTERNAL STAGE SCHEMA & STAGE OBJECT
 CREATE OR REPLACE SCHEMA external_stage_schema;
 
 CREATE OR REPLACE STAGE external_stage_schema.redfin_ext_stage_yml 
-    URL = 's3://redfin-transform-zone-yml/'
-    CREDENTIALS = (
-        AWS_KEY_ID = 'xxxx',
-        AWS_SECRET_KEY = 'xxxx'
-    )
+    URL = 's3://redfin-data-project-yml-1/redfin-transform-zone-yml/'
+    STORAGE_INTEGRATION = s3_int
     FILE_FORMAT = file_format_schema.format_csv;
 
 -- LIST FILES TO CONFIRM ACCESS
 LIST @external_stage_schema.redfin_ext_stage_yml;
 
---------------------------------------------------------
+
+
+-- DROP EXISTING TABLE IF NEEDED (TRUNCATE won't work if table doesn't exist)
+DROP TABLE IF EXISTS redfin_schema.redfin_table;
+
+-- CREATE TABLE WITH ONLY SELECTED COLUMNS
+CREATE OR REPLACE TABLE redfin_schema.redfin_table (
+    period_duration INT,
+    city VARCHAR,
+    state VARCHAR,
+    property_type VARCHAR,
+    median_sale_price FLOAT,
+    median_ppsf FLOAT,
+    homes_sold FLOAT,
+    inventory FLOAT,
+    months_of_supply FLOAT,
+    median_dom FLOAT, 
+    sold_above_list FLOAT,
+    period_end_yr INT,
+    period_end_month VARCHAR -- HERE IS THE CHANGE: Changed to VARCHAR
+);
+
+Truncate Table redfin_schema.redfin_table
+
+
 
 -- CREATE SNOWPIPE SCHEMA AND PIPE
 CREATE OR REPLACE SCHEMA snowpipe_schema;
+
+DROP PIPE IF EXISTS snowpipe_schema.redfin_snowpipe;
+
+
+ALTER WAREHOUSE COMPUTE_WH SET WAREHOUSE_SIZE = 'MEDIUM';  -- ITNA WAIT NHI HOTA MUJHSE 
 
 CREATE OR REPLACE PIPE snowpipe_schema.redfin_snowpipe
 AUTO_INGEST = TRUE
 AS 
 COPY INTO redfin_schema.redfin_table
-FROM @external_stage_schema.redfin_ext_stage_yml;
+FROM @external_stage_schema.redfin_ext_stage_yml
+FILE_FORMAT = (FORMAT_NAME = file_format_schema.format_csv)
+ON_ERROR = 'CONTINUE'; -- Agar koi row mein error aaye toh continue karega, ya 'ABORT_STATEMENT' bhi kar sakte waise pr wo maine pehle kia tha errors theek karne ke lie 
+
+
+ALTER WAREHOUSE COMPUTE_WH SET WAREHOUSE_SIZE = 'X-SMALL';  ---KAAM HOGYA WAPAS AAO BUDGET MAI 
+
+
+
 
 -- DESC TO CHECK PIPE STATUS
 DESC PIPE snowpipe_schema.redfin_snowpipe;
+
+
+SHOW PIPES
+
+
+ ALTER PIPE snowpipe_schema.redfin_snowpipe REFRESH;
+
+ALTER PIPE snowpipe_schema.redfin_snowpipe SET PIPE_EXECUTION_PAUSED = FALSE;
+
+
+-- OPTIONAL: Check contents and count
+SELECT * FROM redfin_schema.redfin_table LIMIT 10;
+SELECT COUNT(*) FROM redfin_schema.redfin_table;
+
+--------------------------------------------------------
+'''
+ROUGH WORK
+
+
+ALTER WAREHOUSE COMPUTE_WH SET WAREHOUSE_SIZE = 'MEDIUM';
+ALTER WAREHOUSE COMPUTE_WH SET WAREHOUSE_SIZE = 'X-SMALL';
+
+COPY INTO redfin_schema.redfin_table
+FROM @external_stage_schema.redfin_ext_stage_yml
+FILE_FORMAT = (FORMAT_NAME = file_format_schema.format_csv)
+ON_ERROR = 'CONTINUE'; -- Agar koi row mein error aaye toh continue karega, ya 'ABORT_STATEMENT' bhi kar sakte ho
+--------------------------------------------------------
+'''
+
+
+
+--------------------------------------------------------
+
+
+
